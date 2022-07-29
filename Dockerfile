@@ -44,6 +44,7 @@ RUN npm install minimist --location=global
 RUN npm install json2csv --location=global
 
 RUN apt-get install -yq moreutils
+RUN apt-get install -yq r-base
 
 ADD ./cli-tools/ /usr/local/sbin/
 

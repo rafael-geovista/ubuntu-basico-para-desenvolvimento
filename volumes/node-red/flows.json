@@ -811,5 +811,95 @@
         "x": 340,
         "y": 760,
         "wires": []
+    },
+    {
+        "id": "4f1cdd60cb865ebf",
+        "type": "inject",
+        "z": "1e279abe215552d7",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 135,
+        "y": 900,
+        "wires": [
+            [
+                "030c25a84d2972ba"
+            ]
+        ],
+        "l": false
+    },
+    {
+        "id": "030c25a84d2972ba",
+        "type": "exec queue",
+        "z": "1e279abe215552d7",
+        "name": "R",
+        "currentLine": {
+            "row": 0,
+            "column": 19
+        },
+        "command": "Rscript $file",
+        "debugMode": false,
+        "outputs": 1,
+        "useSpawn": "false",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "javascript",
+        "template": "cat(\"Hello World!\")",
+        "output": "str",
+        "outputEmpty": false,
+        "vimMode": false,
+        "queue": 1,
+        "addpayCB": false,
+        "splitLine": false,
+        "cleanQueue": true,
+        "x": 250,
+        "y": 900,
+        "wires": [
+            [
+                "4c1aa53892450cf2"
+            ]
+        ]
+    },
+    {
+        "id": "4c1aa53892450cf2",
+        "type": "debug",
+        "z": "1e279abe215552d7",
+        "name": "debug 3",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "counter",
+        "x": 355,
+        "y": 900,
+        "wires": [],
+        "l": false
+    },
+    {
+        "id": "0ee36e90ea5af89d",
+        "type": "comment",
+        "z": "1e279abe215552d7",
+        "name": "Executa \"Hello World\" em R",
+        "info": "",
+        "x": 210,
+        "y": 860,
+        "wires": []
     }
 ]
