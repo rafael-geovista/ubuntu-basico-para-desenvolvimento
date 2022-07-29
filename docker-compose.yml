@@ -18,5 +18,6 @@ services:
       - ./volumes/node-red:/data/node-red # DEVELOPMENT ONLY
       - ./volumes/rest:/data/rest
       - ./volumes/workspace:/data/workspace
+      - ./cli-tools:/usr/local/sbin/
 #      - "C:/:/data/C"
     container_name: ubuntu-dev

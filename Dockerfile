@@ -46,7 +46,7 @@ RUN npm install json2csv --location=global
 RUN apt-get install -yq moreutils
 RUN apt-get install -yq r-base
 
-ADD ./cli-tools/ /usr/local/sbin/
+#ADD ./cli-tools/ /usr/local/sbin/
 
 ENV LANG C.UTF-8
 ENV LC_ALL C.UTF-8
