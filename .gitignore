@@ -1,0 +1,3 @@
+volumes/node-red/node_modules
+volumes/workspace/
+volumes/rest/

@@ -1,0 +1,22 @@
+version: "3.3"
+
+services:
+  osiris:
+    build: .
+    image: ubuntu-dev
+    environment:
+      NODE_PATH: "/usr/local/lib/node_modules"
+      PG_USER: "${PG_USER}"
+      PG_PASSWD: "${PG_PASSWD}"
+      PG_HOST: "${PG_HOST}"
+      PG_PORT: "${PG_PORT}"
+      PG_DATABASE: "${PG_DATABASE}"
+      WORKDIR: "${WORKDIR}"
+    ports:
+      - "1880:1880"
+    volumes:
+      - ./volumes/node-red:/data/node-red # DEVELOPMENT ONLY
+      - ./volumes/rest:/data/rest
+      - ./volumes/workspace:/data/workspace
+#      - "C:/:/data/C"
+    container_name: ubuntu-dev

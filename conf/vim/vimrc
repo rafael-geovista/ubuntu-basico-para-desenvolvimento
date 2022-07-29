@@ -1,0 +1,85 @@
+runtime! debian.vim
+
+if has("syntax")
+  syntax on
+endif
+
+set showmatch		" Show matching brackets.
+set belloff=all
+set nocompatible " Use Vim settings, rather than Vi settings
+set softtabstop=4 " Indent by 2 spaces when hitting tab
+set shiftwidth=4 " Indent by 4 spaces when auto-indenting
+set tabstop=4 " Show existing tab with 4 spaces width
+filetype indent on " Enable indenting for files
+set autoindent " Enable auto indenting
+set nobackup " Disable backup files
+set noswapfile " Disable swp backup files
+set laststatus=2 "show status line
+set statusline=%F%m%r%h%w%=(%{&ff}/%Y)\ (line\ %l\/%L,\ col\ %c)\
+set wildmenu " Display command line's tab complete options as a menu.
+colorscheme industry
+set pastetoggle=<F3>
+set nu
+colorscheme industry
+
+map <C-P> "pdggdG"pP
+set foldmethod=marker
+
+function! ExecuteOnTerminal(type) range
+	if (&ft=='javascript') " check if filetype is javascript
+		if a:type == "V"
+			:'<,'>w! /tmp/file.js
+			let language = system('file="/tmp/file.js"; flag="false"; while read line; do if [[ "$line" =~ ^import.*$ ]];then flag="true"; fi; done < $file; if [[ "$flag" = "true" ]];then echo "mjs"; else echo "js"; fi')
+			if (language =~ "mjs")
+				:'<,'>w! /tmp/file.mjs
+				:vert botright terminal node /tmp/file.mjs
+			else
+				:'<,'>w! /tmp/file.js
+				:vert botright terminal node /tmp/file.js
+			endif
+		else
+			:w! /tmp/file.js
+			let language = system('file="/tmp/file.js"; flag="false"; while read line; do if [[ "$line" =~ ^import.*$ ]];then flag="true"; fi; done < $file; if [[ "$flag" = "true" ]];then echo "mjs"; else echo "js"; fi')
+			if (language =~ "mjs")
+				:w! /tmp/file.mjs
+				:vert botright terminal node /tmp/file.mjs
+			else
+				:w! /tmp/file.js
+				:vert botright terminal node /tmp/file.js
+			endif
+		endif
+	elseif (&ft=='bash' || &ft=='sh')
+		if a:type == "V"
+			"call system('notify-send bash (range)')
+			:vert botright '<,'> %terminal bash
+		else
+			"call system('notify-send bash')
+			:vert botright %terminal bash
+		endif
+	elseif (&ft=='zsh')
+		if a:type == "V"
+			:vert botright '<,'> %terminal zsh
+		else
+			:vert botright %terminal zsh
+		endif
+	elseif (&ft=='python')
+		if a:type == "V"
+			"call system('notify-send py (range)')
+			:vert botright '<,'> %terminal python3
+		else
+			"call system('notify-send py')
+			:vert botright %terminal python3
+		endif
+	elseif (&ft=='awk')
+		if a:type == "V"
+			'<,'>w! /tmp/file.awk
+		else
+			:w! /tmp/file.awk
+		endif
+		:vert botright terminal awk -f /tmp/file.awk /home/rafael/sample
+		":vert botright terminal awk -F ',' -v sqsqsqsq="'" -f /tmp/file.awk /home/rafael/sample /home/rafael/sample2
+	endif
+endfunction
+
+vnoremap <silent> <F10> :call ExecuteOnTerminal("V")<CR>
+nnoremap <silent> <F10> :call ExecuteOnTerminal("I")<CR>

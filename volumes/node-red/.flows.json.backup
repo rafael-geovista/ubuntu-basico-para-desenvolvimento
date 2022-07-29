@@ -1,0 +1,1060 @@
+[
+    {
+        "id": "94b0e6bba5036640",
+        "type": "tab",
+        "label": "Flow 1",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "1e279abe215552d7",
+        "type": "tab",
+        "label": "Tutorial",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "a504cbdf39a58d0a",
+        "type": "inject",
+        "z": "94b0e6bba5036640",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 80,
+        "wires": [
+            [
+                "895689d7951c1111"
+            ]
+        ]
+    },
+    {
+        "id": "6f113bdda2fd0938",
+        "type": "function",
+        "z": "94b0e6bba5036640",
+        "name": "Lista arquivos no servidor",
+        "func": "const axios = global.get('axios')\n\nasync function main(){\n    try {\n\t    const vetorArquivos = (await axios.get('https://api.geovista.com.br/siurb/listFolder')).data\n\t\tfor ( i = 0; i < vetorArquivos.length; i++ ){\n\t\t\tmsg.payload = vetorArquivos[i]\n\t\t\tnode.send(msg)\n\t\t}\n    } catch( error ){\n        node.error(error)\n    }\n}\nmain()",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 780,
+        "y": 80,
+        "wires": [
+            [
+                "62625c098240325e"
+            ]
+        ]
+    },
+    {
+        "id": "62625c098240325e",
+        "type": "exec queue",
+        "z": "94b0e6bba5036640",
+        "name": "baixa arquivos e converte para csv",
+        "currentLine": {
+            "row": 19,
+            "column": 60
+        },
+        "command": "bash $file",
+        "debugMode": false,
+        "outputs": 1,
+        "useSpawn": "false",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "sh",
+        "template": "set -e # força shell a parar execução em caso de erro\n\n# define variável no shell recebendo parâmetro externo do fluxo\nfileName=\"{{{payload}}}\"\nfileNameWithoutExtension=\"${fileName%.*}\"\n\n# define variáveis em bash\ninputFolder=\"/data/workspace/siurb/1-input\"\ncsvFolder=\"/data/workspace/siurb/2-csv\"\nxmlTratadoFolder=\"/data/workspace/siurb/3-xmlTratado\"\n\n# cria diretórios caso eles não existam\nmkdir -p \"$inputFolder\"\nmkdir -p \"$csvFolder\"\nmkdir -p \"$xmlTratadoFolder\"\n\n# baixa arquivos da API e os armazena dentro de $inputFolder\nwget -O \"$inputFolder/$fileName\" \"https://api.geovista.com.br/bim/siurb/$fileName\" 2> /dev/null\n\n# corrige UTF8 BOM (https://unix.stackexchange.com/a/381263)\nsed -i '1s/^\\xEF\\xBB\\xBF//' \"$inputFolder/$fileName\"\n\nextension=\"${fileName##*.}\"\nif [ \"$extension\" = \"xlsx\" ]; then\n    # caso seja xlsx converte para csv e salva em csvFolder\n    xlsx2csv  --outputencoding 'utf8'  -d '#' \"$inputFolder/$fileName\" | sed 's/\"\"/\"/g' > \"$csvFolder/$fileNameWithoutExtension.csv\"\n    echo \"$csvFolder/$fileNameWithoutExtension.csv\" # envia string para o próximo nodo\nelif [ \"$extension\" = \"csv\" ]; then\n    # caso seja csv apenas cria uma cópia em csvFolder\n    cat \"$inputFolder/$fileName\" | sed 's/\"\"/\"/g' | sed 's/;/#/g' > \"$csvFolder/$fileName\"\n    echo \"$csvFolder/$fileName\" # envia string para o próximo nodo\nfi",
+        "output": "str",
+        "outputEmpty": false,
+        "vimMode": false,
+        "queue": "5",
+        "addpayCB": false,
+        "splitLine": false,
+        "cleanQueue": true,
+        "x": 440,
+        "y": 160,
+        "wires": [
+            [
+                "3903406a1dec86ea"
+            ]
+        ]
+    },
+    {
+        "id": "3903406a1dec86ea",
+        "type": "exec queue",
+        "z": "94b0e6bba5036640",
+        "name": "gera dados para json inicial (files.json)",
+        "currentLine": {
+            "row": 39,
+            "column": 59
+        },
+        "command": "python3 $file",
+        "debugMode": false,
+        "outputs": 1,
+        "useSpawn": "false",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "sh",
+        "template": "import os\nimport re\nimport json\n\nfileName = \"{{{payload}}}\"\noutputFolder = \"/data/workspace/siurb/3-xmlTratado/\"\n    \nfile = open(fileName, \"r+\")\ncounter = 1 \nheader = \"\"\njsonVetor = json.loads('[]')\nfor linha in file:\n    objeto = {}\n    if counter == 1:\n        header = linha.split('#')\n    else:\n        linha = linha.split('#')\n        xml = re.sub('^\"|\"$', \"\", linha[13])\n        categoria = linha[2]\n        jsonData = json.loads(os.popen(\"xmltojson '\" + xml + \"'\" ).read())\n        text_file = open(outputFolder + categoria + \".json\", \"a\")\n\n        i = 0 \n        for column in header:\n            if i != 13: \n                objeto[header[i]] = linha[i]\n            i += 1\n        for atributo in jsonData.get('formulario').get('atributo'):\n            if 'valor' in atributo:\n                rotulo = atributo.get('rotulo').get('_text')\n                valor = atributo.get('valor').get('_text')\n                objeto[rotulo] = rotulo\n            else:\n                rotulo = atributo.get('rotulo').get('_text')\n                valor = 'null'\n                objeto[rotulo] = valor\n        text_file.write(json.dumps(objeto))\n        text_file.close()\n    counter += 1\nprint(\"Input: \" + fileName + \" (processamento finalizado)\")",
+        "output": "str",
+        "outputEmpty": false,
+        "vimMode": false,
+        "queue": "1",
+        "addpayCB": false,
+        "splitLine": false,
+        "cleanQueue": true,
+        "x": 820,
+        "y": 160,
+        "wires": [
+            [
+                "bd4a3e53aa888a59"
+            ]
+        ]
+    },
+    {
+        "id": "eab3a3a6cbe6e9c5",
+        "type": "exec queue",
+        "z": "94b0e6bba5036640",
+        "name": "tratamento final em json (converte para csv)",
+        "currentLine": {
+            "row": 9,
+            "column": 66
+        },
+        "command": "bash $file",
+        "debugMode": false,
+        "outputs": 1,
+        "useSpawn": "false",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "sh",
+        "template": "outputFolder=\"/data/workspace/siurb/3-xmlTratado\"\n\nfor file in \"$outputFolder/\"*\ndo\n    fileWithoutExtension=\"${file%.*}\"\n    cat \"$fileWithoutExtension.json\" | jq -s '' | sponge \"$fileWithoutExtension.json\"\n    cat \"$fileWithoutExtension.json\" | json2csv -q '' -d ';' > \"$fileWithoutExtension.csv\"\ndone\n\necho \"Todos os arquivos foram gerados... Cheque a pasta xmlTratado\"\n",
+        "output": "str",
+        "outputEmpty": false,
+        "vimMode": false,
+        "queue": "1",
+        "addpayCB": false,
+        "splitLine": false,
+        "cleanQueue": true,
+        "x": 690,
+        "y": 260,
+        "wires": [
+            [
+                "eade7a6f5aa39f8f"
+            ]
+        ]
+    },
+    {
+        "id": "bd4a3e53aa888a59",
+        "type": "debug",
+        "z": "94b0e6bba5036640",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "counter",
+        "x": 1100,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "eade7a6f5aa39f8f",
+        "type": "debug",
+        "z": "94b0e6bba5036640",
+        "name": "debug 2",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "counter",
+        "x": 960,
+        "y": 260,
+        "wires": []
+    },
+    {
+        "id": "895689d7951c1111",
+        "type": "exec queue",
+        "z": "94b0e6bba5036640",
+        "name": "deleta arquivos na pasta xmlTratado",
+        "currentLine": {
+            "row": 1,
+            "column": 56
+        },
+        "command": "bash $file",
+        "debugMode": false,
+        "outputs": 1,
+        "useSpawn": "false",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "sh",
+        "template": "rm \"/data/workspace/siurb/1-input/\"* 2> \"/dev/null\"\nrm \"/data/workspace/siurb/3-xmlTratado/\"* 2> \"/dev/null\"\necho \"start next node\"",
+        "output": "str",
+        "outputEmpty": false,
+        "vimMode": false,
+        "queue": "5",
+        "addpayCB": false,
+        "splitLine": false,
+        "cleanQueue": true,
+        "x": 430,
+        "y": 80,
+        "wires": [
+            [
+                "6f113bdda2fd0938"
+            ]
+        ]
+    },
+    {
+        "id": "caeb500f8fddc093",
+        "type": "status",
+        "z": "94b0e6bba5036640",
+        "name": "",
+        "scope": [
+            "3903406a1dec86ea"
+        ],
+        "x": 120,
+        "y": 260,
+        "wires": [
+            [
+                "4d55d29172fd02d7"
+            ]
+        ]
+    },
+    {
+        "id": "4d55d29172fd02d7",
+        "type": "function",
+        "z": "94b0e6bba5036640",
+        "name": "checa status 0 (0/1)",
+        "func": "if ( msg.status.text === \"0 (0/1)\" ){\n    return msg\n}\n",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 340,
+        "y": 260,
+        "wires": [
+            [
+                "eab3a3a6cbe6e9c5"
+            ]
+        ]
+    },
+    {
+        "id": "1fe0aad8f59279e6",
+        "type": "exec queue",
+        "z": "1e279abe215552d7",
+        "name": "node.js code",
+        "currentLine": {
+            "row": 0,
+            "column": 24
+        },
+        "command": "node $file",
+        "debugMode": false,
+        "outputs": 1,
+        "useSpawn": "false",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "javascript",
+        "template": "console.log('Hello World')",
+        "output": "str",
+        "outputEmpty": false,
+        "vimMode": true,
+        "queue": "1",
+        "addpayCB": false,
+        "splitLine": false,
+        "cleanQueue": true,
+        "x": 270,
+        "y": 100,
+        "wires": [
+            [
+                "067388d0f5f0bc63"
+            ]
+        ]
+    },
+    {
+        "id": "c4bbe370378bc234",
+        "type": "inject",
+        "z": "1e279abe215552d7",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 135,
+        "y": 100,
+        "wires": [
+            [
+                "1fe0aad8f59279e6"
+            ]
+        ],
+        "l": false
+    },
+    {
+        "id": "067388d0f5f0bc63",
+        "type": "debug",
+        "z": "1e279abe215552d7",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "counter",
+        "x": 535,
+        "y": 100,
+        "wires": [],
+        "l": false
+    },
+    {
+        "id": "6d5e78de3114b886",
+        "type": "exec queue",
+        "z": "1e279abe215552d7",
+        "name": "bash code",
+        "currentLine": {
+            "row": 0,
+            "column": 18
+        },
+        "command": "bash $file",
+        "debugMode": false,
+        "outputs": 1,
+        "useSpawn": "false",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "sh",
+        "template": "echo \"Hello World\"\n",
+        "output": "str",
+        "outputEmpty": false,
+        "vimMode": true,
+        "queue": "1",
+        "addpayCB": false,
+        "splitLine": false,
+        "cleanQueue": true,
+        "x": 270,
+        "y": 300,
+        "wires": [
+            [
+                "49702ca370d9f756"
+            ]
+        ]
+    },
+    {
+        "id": "4ebf5b2aa93f2b67",
+        "type": "inject",
+        "z": "1e279abe215552d7",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 135,
+        "y": 300,
+        "wires": [
+            [
+                "6d5e78de3114b886"
+            ]
+        ],
+        "l": false
+    },
+    {
+        "id": "49702ca370d9f756",
+        "type": "debug",
+        "z": "1e279abe215552d7",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "counter",
+        "x": 535,
+        "y": 300,
+        "wires": [],
+        "l": false
+    },
+    {
+        "id": "37a8a116aae3dce3",
+        "type": "exec queue",
+        "z": "1e279abe215552d7",
+        "name": "python code (template parameters)",
+        "currentLine": {
+            "row": 0,
+            "column": 22
+        },
+        "command": "python3 $file",
+        "debugMode": false,
+        "outputs": 1,
+        "useSpawn": "false",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "python",
+        "template": "print('{{{payload}}}')",
+        "output": "str",
+        "outputEmpty": false,
+        "vimMode": true,
+        "queue": "1",
+        "addpayCB": false,
+        "splitLine": false,
+        "cleanQueue": true,
+        "x": 340,
+        "y": 400,
+        "wires": [
+            [
+                "b35308b00d181b45"
+            ]
+        ]
+    },
+    {
+        "id": "9c2c5923aff087f1",
+        "type": "inject",
+        "z": "1e279abe215552d7",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 135,
+        "y": 400,
+        "wires": [
+            [
+                "37a8a116aae3dce3"
+            ]
+        ],
+        "l": false
+    },
+    {
+        "id": "b35308b00d181b45",
+        "type": "debug",
+        "z": "1e279abe215552d7",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "counter",
+        "x": 535,
+        "y": 400,
+        "wires": [],
+        "l": false
+    },
+    {
+        "id": "038111031078bda8",
+        "type": "exec queue",
+        "z": "1e279abe215552d7",
+        "name": "python code (parsed json output)",
+        "currentLine": {
+            "row": 0,
+            "column": 1
+        },
+        "command": "python3 $file",
+        "debugMode": false,
+        "outputs": 1,
+        "useSpawn": "false",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "python",
+        "template": "print('''\n{\n   \"value\": \"Hello World\" \n}\n\n''')",
+        "output": "parsedJSON",
+        "outputEmpty": false,
+        "vimMode": true,
+        "queue": "1",
+        "addpayCB": false,
+        "splitLine": false,
+        "cleanQueue": true,
+        "x": 330,
+        "y": 800,
+        "wires": [
+            [
+                "6bf711436e4c78b2"
+            ]
+        ]
+    },
+    {
+        "id": "e61f3df446be8e0e",
+        "type": "inject",
+        "z": "1e279abe215552d7",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 135,
+        "y": 800,
+        "wires": [
+            [
+                "038111031078bda8"
+            ]
+        ],
+        "l": false
+    },
+    {
+        "id": "6bf711436e4c78b2",
+        "type": "debug",
+        "z": "1e279abe215552d7",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "counter",
+        "x": 535,
+        "y": 800,
+        "wires": [],
+        "l": false
+    },
+    {
+        "id": "a9e08253657428c1",
+        "type": "exec queue",
+        "z": "1e279abe215552d7",
+        "name": "python code (exec sleep 3)",
+        "currentLine": {
+            "row": 6,
+            "column": 2
+        },
+        "command": "python3 $file ",
+        "debugMode": false,
+        "outputs": 1,
+        "useSpawn": "false",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "python",
+        "template": "import time\n\ntime.sleep(3)\nprint(\"Hello World\")\ntime.sleep(3)\nprint(\"Hello World\")\ntime.sleep(3)\nprint(\"Hello World\")",
+        "output": "str",
+        "outputEmpty": false,
+        "vimMode": true,
+        "queue": "1",
+        "addpayCB": false,
+        "splitLine": false,
+        "cleanQueue": true,
+        "x": 320,
+        "y": 600,
+        "wires": [
+            [
+                "6c5a597dd98e3c69"
+            ]
+        ]
+    },
+    {
+        "id": "71ed70de01f00df6",
+        "type": "inject",
+        "z": "1e279abe215552d7",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 135,
+        "y": 600,
+        "wires": [
+            [
+                "a9e08253657428c1"
+            ]
+        ],
+        "l": false
+    },
+    {
+        "id": "6c5a597dd98e3c69",
+        "type": "debug",
+        "z": "1e279abe215552d7",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "counter",
+        "x": 535,
+        "y": 600,
+        "wires": [],
+        "l": false
+    },
+    {
+        "id": "3c40817b162d1ba9",
+        "type": "exec queue",
+        "z": "1e279abe215552d7",
+        "name": "python code (spawn sleep 3)",
+        "currentLine": {
+            "row": 8,
+            "column": 0
+        },
+        "command": "python3 -u $file",
+        "debugMode": false,
+        "outputs": 1,
+        "useSpawn": "true",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "python",
+        "template": "import time\n\ntime.sleep(3)\nprint(\"Hello World\")\ntime.sleep(3)\nprint(\"Hello World\")\ntime.sleep(3)\nprint(\"Hello World\")\n",
+        "output": "str",
+        "outputEmpty": false,
+        "vimMode": true,
+        "queue": "1",
+        "addpayCB": false,
+        "splitLine": false,
+        "cleanQueue": true,
+        "x": 320,
+        "y": 700,
+        "wires": [
+            [
+                "15f2032281da3432"
+            ]
+        ]
+    },
+    {
+        "id": "3316a7a3cc4bbdb6",
+        "type": "inject",
+        "z": "1e279abe215552d7",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 135,
+        "y": 700,
+        "wires": [
+            [
+                "3c40817b162d1ba9"
+            ]
+        ],
+        "l": false
+    },
+    {
+        "id": "15f2032281da3432",
+        "type": "debug",
+        "z": "1e279abe215552d7",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "counter",
+        "x": 535,
+        "y": 700,
+        "wires": [],
+        "l": false
+    },
+    {
+        "id": "34e8cb4e37f2d8a9",
+        "type": "exec queue",
+        "z": "1e279abe215552d7",
+        "name": "python code (queue)",
+        "currentLine": {
+            "row": 3,
+            "column": 2
+        },
+        "command": "python3 $file",
+        "debugMode": false,
+        "outputs": 1,
+        "useSpawn": "false",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "python",
+        "template": "import time\n\ntime.sleep(3)\nprint(\"Hello World\")",
+        "output": "str",
+        "outputEmpty": false,
+        "vimMode": true,
+        "queue": "3",
+        "addpayCB": false,
+        "splitLine": false,
+        "cleanQueue": true,
+        "x": 300,
+        "y": 500,
+        "wires": [
+            [
+                "558c5a8f111dbef9"
+            ]
+        ]
+    },
+    {
+        "id": "376c02853cd956fb",
+        "type": "inject",
+        "z": "1e279abe215552d7",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 135,
+        "y": 500,
+        "wires": [
+            [
+                "34e8cb4e37f2d8a9"
+            ]
+        ],
+        "l": false
+    },
+    {
+        "id": "558c5a8f111dbef9",
+        "type": "debug",
+        "z": "1e279abe215552d7",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "counter",
+        "x": 535,
+        "y": 500,
+        "wires": [],
+        "l": false
+    },
+    {
+        "id": "623a2f138efe29ed",
+        "type": "exec queue",
+        "z": "1e279abe215552d7",
+        "name": "using node.js synchronous code without interfering with the flow",
+        "currentLine": {
+            "row": 0,
+            "column": 0
+        },
+        "command": "node $file",
+        "debugMode": false,
+        "outputs": 1,
+        "useSpawn": "false",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "javascript",
+        "template": "sleepSync(5000)\nconsole.log('Sync Node.js Hello World')\n\n// function\nfunction sleepSync(ms) {\n  var start = new Date().getTime(), expire = start + ms;\n  while (new Date().getTime() < expire) { }\n  return;\n}",
+        "output": "str",
+        "outputEmpty": false,
+        "vimMode": true,
+        "queue": "1",
+        "addpayCB": false,
+        "splitLine": false,
+        "cleanQueue": true,
+        "x": 430,
+        "y": 200,
+        "wires": [
+            [
+                "17e18b61b0e44bea"
+            ]
+        ]
+    },
+    {
+        "id": "4de7adfb59574592",
+        "type": "inject",
+        "z": "1e279abe215552d7",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 135,
+        "y": 200,
+        "wires": [
+            [
+                "623a2f138efe29ed"
+            ]
+        ],
+        "l": false
+    },
+    {
+        "id": "17e18b61b0e44bea",
+        "type": "debug",
+        "z": "1e279abe215552d7",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "counter",
+        "x": 705,
+        "y": 200,
+        "wires": [],
+        "l": false
+    },
+    {
+        "id": "d9f0145631e0c10c",
+        "type": "inject",
+        "z": "1e279abe215552d7",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 825,
+        "y": 200,
+        "wires": [
+            [
+                "7571802f132d43f8"
+            ]
+        ],
+        "l": false
+    },
+    {
+        "id": "7571802f132d43f8",
+        "type": "function",
+        "z": "1e279abe215552d7",
+        "name": "using synchronous code interfering with the flow",
+        "func": "sleepSync(5000)\nmsg.payload = 'Sync Node.js Hello World'\nreturn msg\n\n// function\nfunction sleepSync(ms) {\n  var start = new Date().getTime(), expire = start + ms;\n  while (new Date().getTime() < expire) { }\n  return;\n}",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1060,
+        "y": 200,
+        "wires": [
+            [
+                "2325d1e2296efe00"
+            ]
+        ]
+    },
+    {
+        "id": "2325d1e2296efe00",
+        "type": "debug",
+        "z": "1e279abe215552d7",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "counter",
+        "x": 1295,
+        "y": 200,
+        "wires": [],
+        "l": false
+    },
+    {
+        "id": "afa31ed79a2035dd",
+        "type": "comment",
+        "z": "1e279abe215552d7",
+        "name": "Executa código em node.js",
+        "info": "",
+        "x": 210,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "6253d53806fc1898",
+        "type": "comment",
+        "z": "1e279abe215552d7",
+        "name": "Executa código em node.js síncrono sem interferir no fluxo",
+        "info": "",
+        "x": 310,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "6169695ccb372391",
+        "type": "comment",
+        "z": "1e279abe215552d7",
+        "name": "Executa código em node.js síncrono travando o fluxo",
+        "info": "",
+        "x": 970,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "90d9b37bfda3fb83",
+        "type": "comment",
+        "z": "1e279abe215552d7",
+        "name": "Executa código em bash",
+        "info": "",
+        "x": 200,
+        "y": 260,
+        "wires": []
+    },
+    {
+        "id": "3d488795681b2e71",
+        "type": "comment",
+        "z": "1e279abe215552d7",
+        "name": "Executa código em python recebendo parâmetro do fluxo",
+        "info": "",
+        "x": 300,
+        "y": 360,
+        "wires": []
+    },
+    {
+        "id": "0d7e62bff784ceb4",
+        "type": "comment",
+        "z": "1e279abe215552d7",
+        "name": "Executa python com fila de 3",
+        "info": "",
+        "x": 220,
+        "y": 460,
+        "wires": []
+    },
+    {
+        "id": "0032ed5054e90a4e",
+        "type": "comment",
+        "z": "1e279abe215552d7",
+        "name": "Executa python (exec mode- imprime após o nodo é executado)",
+        "info": "",
+        "x": 320,
+        "y": 560,
+        "wires": []
+    },
+    {
+        "id": "51ba9bb37b3f59f6",
+        "type": "comment",
+        "z": "1e279abe215552d7",
+        "name": "Executa python (spawn mode- imprime conforme nodo é executado)",
+        "info": "",
+        "x": 340,
+        "y": 660,
+        "wires": []
+    },
+    {
+        "id": "2fac0acf172aa25c",
+        "type": "comment",
+        "z": "1e279abe215552d7",
+        "name": "Executa python (imprime saída no fluxo como um Objeto Javascript)",
+        "info": "",
+        "x": 340,
+        "y": 760,
+        "wires": []
+    }
+]

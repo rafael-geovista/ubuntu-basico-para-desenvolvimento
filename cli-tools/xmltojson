@@ -1,0 +1,11 @@
+#!/usr/local/bin/node
+
+var convertXML = require('xml-js');
+
+try {
+    const xml = require('minimist')(process.argv.slice(2))._[0]
+    const json = convertXML.xml2js(xml, {compact: true, spaces: 4})
+    console.log(JSON.stringify(json))
+} catch (error){
+    console.error('Error parsing XML: \n\n' + error)
+}

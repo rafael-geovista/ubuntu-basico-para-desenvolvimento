@@ -1,0 +1,51 @@
+{
+    "_": {
+        "editor": {
+            "view": {
+                "view-store-zoom": false,
+                "view-store-position": false,
+                "view-show-grid": true,
+                "view-snap-grid": true,
+                "view-grid-size": 20,
+                "view-node-status": true,
+                "view-node-show-label": true,
+                "view-show-tips": true,
+                "view-show-welcome-tours": true
+            }
+        }
+    },
+    "admin": {
+        "editor": {
+            "view": {
+                "view-store-zoom": false,
+                "view-store-position": false,
+                "view-show-grid": true,
+                "view-snap-grid": true,
+                "view-grid-size": "20",
+                "view-node-status": true,
+                "view-node-show-label": true,
+                "view-show-tips": true,
+                "view-show-welcome-tours": true
+            },
+            "tours": {
+                "welcome": "2.2.2"
+            }
+        },
+        "git": {
+            "globalUser": {
+                "name": "Rafael Muynarsk",
+                "email": "muynarsk.rafael@gmail.com"
+            },
+            "user": {
+                "name": "geovista",
+                "email": "rafael@geovista.com.br"
+            },
+            "workflow": {
+                "mode": "manual"
+            }
+        },
+        "menu-deploymenu-item-node": true,
+        "menu-deploymenu-item-full": false,
+        "menu-menu-item-sidebar": true
+    }
+}
