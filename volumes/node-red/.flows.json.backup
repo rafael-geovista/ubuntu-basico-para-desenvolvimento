@@ -2,7 +2,7 @@
     {
         "id": "94b0e6bba5036640",
         "type": "tab",
-        "label": "Flow 1",
+        "label": "Flow",
         "disabled": false,
         "info": "",
         "env": []
@@ -16,7 +16,13 @@
         "env": []
     },
     {
-        "id": "a504cbdf39a58d0a",
+        "id": "d7ccb52abbceb853",
+        "type": "websocket-listener",
+        "path": "/siurb/websockets",
+        "wholemsg": "false"
+    },
+    {
+        "id": "20c8e0cd7a0cf245",
         "type": "inject",
         "z": "94b0e6bba5036640",
         "name": "",
@@ -36,228 +42,10 @@
         "topic": "",
         "payload": "",
         "payloadType": "date",
-        "x": 160,
-        "y": 140,
+        "x": 340,
+        "y": 120,
         "wires": [
-            [
-                "895689d7951c1111"
-            ]
-        ]
-    },
-    {
-        "id": "6f113bdda2fd0938",
-        "type": "function",
-        "z": "94b0e6bba5036640",
-        "name": "Lista arquivos no servidor",
-        "func": "const axios = global.get('axios')\n\nasync function main(){\n    try {\n\t    const vetorArquivos = (await axios.get('https://api.geovista.com.br/siurb/listFolder')).data\n\t\tfor ( i = 0; i < vetorArquivos.length; i++ ){\n\t\t\tmsg.payload = vetorArquivos[i]\n\t\t\tnode.send(msg)\n\t\t}\n    } catch( error ){\n        node.error(error)\n    }\n}\nmain()",
-        "outputs": 1,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 800,
-        "y": 140,
-        "wires": [
-            [
-                "62625c098240325e"
-            ]
-        ]
-    },
-    {
-        "id": "62625c098240325e",
-        "type": "exec queue",
-        "z": "94b0e6bba5036640",
-        "name": "baixa arquivos e converte para csv",
-        "currentLine": {
-            "row": 19,
-            "column": 60
-        },
-        "command": "bash $file",
-        "debugMode": false,
-        "outputs": 1,
-        "useSpawn": "false",
-        "field": "payload",
-        "fieldType": "msg",
-        "format": "sh",
-        "template": "set -e # força shell a parar execução em caso de erro\n\n# define variável no shell recebendo parâmetro externo do fluxo\nfileName=\"{{{payload}}}\"\nfileNameWithoutExtension=\"${fileName%.*}\"\n\n# define variáveis em bash\ninputFolder=\"/data/workspace/siurb/1-input\"\ncsvFolder=\"/data/workspace/siurb/2-csv\"\nxmlTratadoFolder=\"/data/workspace/siurb/3-xmlTratado\"\n\n# cria diretórios caso eles não existam\nmkdir -p \"$inputFolder\"\nmkdir -p \"$csvFolder\"\nmkdir -p \"$xmlTratadoFolder\"\n\n# baixa arquivos da API e os armazena dentro de $inputFolder\nwget -O \"$inputFolder/$fileName\" \"https://api.geovista.com.br/bim/siurb/$fileName\" 2> /dev/null\n\n# corrige UTF8 BOM (https://unix.stackexchange.com/a/381263)\nsed -i '1s/^\\xEF\\xBB\\xBF//' \"$inputFolder/$fileName\"\n\nextension=\"${fileName##*.}\"\nif [ \"$extension\" = \"xlsx\" ]; then\n    # caso seja xlsx converte para csv e salva em csvFolder\n    xlsx2csv  --outputencoding 'utf8'  -d '#' \"$inputFolder/$fileName\" | sed 's/\"\"/\"/g' > \"$csvFolder/$fileNameWithoutExtension.csv\"\n    echo \"$csvFolder/$fileNameWithoutExtension.csv\" # envia string para o próximo nodo\nelif [ \"$extension\" = \"csv\" ]; then\n    # caso seja csv apenas cria uma cópia em csvFolder\n    cat \"$inputFolder/$fileName\" | sed 's/\"\"/\"/g' | sed 's/;/#/g' > \"$csvFolder/$fileName\"\n    echo \"$csvFolder/$fileName\" # envia string para o próximo nodo\nfi",
-        "output": "str",
-        "outputEmpty": false,
-        "vimMode": false,
-        "queue": "5",
-        "addpayCB": false,
-        "splitLine": false,
-        "cleanQueue": true,
-        "x": 460,
-        "y": 220,
-        "wires": [
-            [
-                "3903406a1dec86ea"
-            ]
-        ]
-    },
-    {
-        "id": "3903406a1dec86ea",
-        "type": "exec queue",
-        "z": "94b0e6bba5036640",
-        "name": "gera dados para json inicial (files.json)",
-        "currentLine": {
-            "row": 39,
-            "column": 59
-        },
-        "command": "python3 $file",
-        "debugMode": false,
-        "outputs": 1,
-        "useSpawn": "false",
-        "field": "payload",
-        "fieldType": "msg",
-        "format": "sh",
-        "template": "import os\nimport re\nimport json\n\nfileName = \"{{{payload}}}\"\noutputFolder = \"/data/workspace/siurb/3-xmlTratado/\"\n    \nfile = open(fileName, \"r+\")\ncounter = 1 \nheader = \"\"\njsonVetor = json.loads('[]')\nfor linha in file:\n    objeto = {}\n    if counter == 1:\n        header = linha.split('#')\n    else:\n        linha = linha.split('#')\n        xml = re.sub('^\"|\"$', \"\", linha[13])\n        categoria = linha[2]\n        jsonData = json.loads(os.popen(\"xmltojson '\" + xml + \"'\" ).read())\n        text_file = open(outputFolder + categoria + \".json\", \"a\")\n\n        i = 0 \n        for column in header:\n            if i != 13: \n                objeto[header[i]] = linha[i]\n            i += 1\n        for atributo in jsonData.get('formulario').get('atributo'):\n            if 'valor' in atributo:\n                rotulo = atributo.get('rotulo').get('_text')\n                valor = atributo.get('valor').get('_text')\n                objeto[rotulo] = rotulo\n            else:\n                rotulo = atributo.get('rotulo').get('_text')\n                valor = 'null'\n                objeto[rotulo] = valor\n        text_file.write(json.dumps(objeto))\n        text_file.close()\n    counter += 1\nprint(\"Input: \" + fileName + \" (processamento finalizado)\")",
-        "output": "str",
-        "outputEmpty": false,
-        "vimMode": false,
-        "queue": "1",
-        "addpayCB": false,
-        "splitLine": false,
-        "cleanQueue": true,
-        "x": 840,
-        "y": 220,
-        "wires": [
-            [
-                "bd4a3e53aa888a59"
-            ]
-        ]
-    },
-    {
-        "id": "eab3a3a6cbe6e9c5",
-        "type": "exec queue",
-        "z": "94b0e6bba5036640",
-        "name": "tratamento final em json (converte para csv)",
-        "currentLine": {
-            "row": 9,
-            "column": 66
-        },
-        "command": "bash $file",
-        "debugMode": false,
-        "outputs": 1,
-        "useSpawn": "false",
-        "field": "payload",
-        "fieldType": "msg",
-        "format": "sh",
-        "template": "outputFolder=\"/data/workspace/siurb/3-xmlTratado\"\n\nfor file in \"$outputFolder/\"*\ndo\n    fileWithoutExtension=\"${file%.*}\"\n    cat \"$fileWithoutExtension.json\" | jq -s '' | sponge \"$fileWithoutExtension.json\"\n    cat \"$fileWithoutExtension.json\" | json2csv -q '' -d ';' > \"$fileWithoutExtension.csv\"\ndone\n\necho \"Todos os arquivos foram gerados... Cheque a pasta xmlTratado\"\n",
-        "output": "str",
-        "outputEmpty": false,
-        "vimMode": false,
-        "queue": "1",
-        "addpayCB": false,
-        "splitLine": false,
-        "cleanQueue": true,
-        "x": 710,
-        "y": 320,
-        "wires": [
-            [
-                "eade7a6f5aa39f8f"
-            ]
-        ]
-    },
-    {
-        "id": "bd4a3e53aa888a59",
-        "type": "debug",
-        "z": "94b0e6bba5036640",
-        "name": "debug 1",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": true,
-        "complete": "payload",
-        "targetType": "msg",
-        "statusVal": "",
-        "statusType": "counter",
-        "x": 1120,
-        "y": 220,
-        "wires": []
-    },
-    {
-        "id": "eade7a6f5aa39f8f",
-        "type": "debug",
-        "z": "94b0e6bba5036640",
-        "name": "debug 2",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": true,
-        "complete": "payload",
-        "targetType": "msg",
-        "statusVal": "",
-        "statusType": "counter",
-        "x": 980,
-        "y": 320,
-        "wires": []
-    },
-    {
-        "id": "895689d7951c1111",
-        "type": "exec queue",
-        "z": "94b0e6bba5036640",
-        "name": "deleta arquivos na pasta xmlTratado",
-        "currentLine": {
-            "row": 1,
-            "column": 56
-        },
-        "command": "bash $file",
-        "debugMode": false,
-        "outputs": 1,
-        "useSpawn": "false",
-        "field": "payload",
-        "fieldType": "msg",
-        "format": "sh",
-        "template": "rm \"/data/workspace/siurb/1-input/\"* 2> \"/dev/null\"\nrm \"/data/workspace/siurb/3-xmlTratado/\"* 2> \"/dev/null\"\necho \"start next node\"",
-        "output": "str",
-        "outputEmpty": false,
-        "vimMode": false,
-        "queue": "5",
-        "addpayCB": false,
-        "splitLine": false,
-        "cleanQueue": true,
-        "x": 450,
-        "y": 140,
-        "wires": [
-            [
-                "6f113bdda2fd0938"
-            ]
-        ]
-    },
-    {
-        "id": "caeb500f8fddc093",
-        "type": "status",
-        "z": "94b0e6bba5036640",
-        "name": "",
-        "scope": [
-            "3903406a1dec86ea"
-        ],
-        "x": 140,
-        "y": 320,
-        "wires": [
-            [
-                "4d55d29172fd02d7"
-            ]
-        ]
-    },
-    {
-        "id": "4d55d29172fd02d7",
-        "type": "function",
-        "z": "94b0e6bba5036640",
-        "name": "checa status 0 (0/1)",
-        "func": "if ( msg.status.text === \"0 (0/1)\" ){\n    return msg\n}\n",
-        "outputs": 1,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 360,
-        "y": 320,
-        "wires": [
-            [
-                "eab3a3a6cbe6e9c5"
-            ]
+            []
         ]
     },
     {

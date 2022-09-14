@@ -1,0 +1,10 @@
+install.packages('IRkernel')
+IRkernel::installspec()
+IRkernel::installspec(user = FALSE)
+
+install.packages("magrittr")
+#install.packages("XML")
+install.packages("stringr")
+install.packages("dplyr")
+install.packages("tidyr")
+install.packages("writexl")

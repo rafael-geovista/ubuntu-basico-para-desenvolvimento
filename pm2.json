@@ -1,0 +1,10 @@
+{
+    "apps" : [{
+        "name"        : "node-red",
+        "script"      : "node-red -u /data/node-red"
+    },{ 
+        "name"        : "jupyter",
+        "script"      : "jupyter notebook --no-browser --ip='*' --NotebookApp.token='' --NotebookApp.password='' --allow-root"
+    }]  
+}
+

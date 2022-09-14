@@ -1,23 +1,62 @@
 version: "3.3"
 
 services:
-  osiris:
+  ubuntu-dev:
     build: .
     image: ubuntu-dev
     environment:
       NODE_PATH: "/usr/local/lib/node_modules"
-      PG_USER: "${PG_USER}"
-      PG_PASSWD: "${PG_PASSWD}"
-      PG_HOST: "${PG_HOST}"
-      PG_PORT: "${PG_PORT}"
-      PG_DATABASE: "${PG_DATABASE}"
-      WORKDIR: "${WORKDIR}"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_HOST: "postgres"
+      POSTGRES_PORT: "5432"
+      POSTGRES_DATABASE: "postgres"
+      WORKDIR: "/data/workspace"
     ports:
-      - "1880:1880"
+      - "127.0.0.1:1880:1880"
+      - "127.0.0.1:1881:8888"
+#      - "8181:80"
+    restart: always
     volumes:
       - ./volumes/node-red:/data/node-red # DEVELOPMENT ONLY
       - ./volumes/rest:/data/rest
       - ./volumes/workspace:/data/workspace
       - ./cli-tools:/usr/local/sbin/
-#      - "C:/:/data/C"
     container_name: ubuntu-dev
+    networks:
+      - database
+    
+  postgis-dev:
+    image: postgis/postgis:14-3.2
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+    restart: always
+    volumes:
+      - ./volumes/postgres:/var/lib/postgresql/data/
+    #restart: always
+    container_name: postgis-dev
+    networks: 
+      database:
+        aliases:
+          - postgres
+    
+  pgadmin-lab:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "postgres@postgres.com"
+      PGADMIN_DEFAULT_PASSWORD: "postgres"
+      PGADMIN_LISTEN_PORT: 5433
+      #volumes:
+      #- ./volumes/pgadmin:/pgadmin4
+    ports:
+      - "127.0.0.1:1882:5433"
+    restart: always
+    container_name: pgadmin-lab
+    networks: 
+      database:
+        aliases:
+          - pgadmin
+    
+networks:
+  database:

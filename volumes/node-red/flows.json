@@ -2,7 +2,7 @@
     {
         "id": "94b0e6bba5036640",
         "type": "tab",
-        "label": "Flow 1",
+        "label": "Flow",
         "disabled": false,
         "info": "",
         "env": []
@@ -14,6 +14,12 @@
         "disabled": false,
         "info": "",
         "env": []
+    },
+    {
+        "id": "d7ccb52abbceb853",
+        "type": "websocket-listener",
+        "path": "/siurb/websockets",
+        "wholemsg": "false"
     },
     {
         "id": "1fe0aad8f59279e6",

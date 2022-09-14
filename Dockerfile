@@ -45,13 +45,67 @@ RUN npm install json2csv --location=global
 
 RUN apt-get install -yq moreutils
 RUN apt-get install -yq r-base
+RUN apt-get update
+RUN apt-get install -yq apache2
+#RUN apt-get install -yq postgresql-12
 
 #ADD ./cli-tools/ /usr/local/sbin/
 
 ENV LANG C.UTF-8
 ENV LC_ALL C.UTF-8
+RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
-# START COMMAND
-CMD npm install --prefix /data/node-red && \
-	pm2 start "node-red -u /data/node-red" --name=node-red --no-daemon
+############################################################ 
+#                   Installing Jupyter
+############################################################ 
+RUN pwd
+RUN pip3 install jupyterlab
+RUN pip3 install notebook
+# adding Vim Mode
+#RUN mkdir -p $(jupyter --data-dir)/nbextensions ; \
+#    cd $(jupyter --data-dir)/nbextensions ; \
+#    git clone https://github.com/lambdalisue/jupyter-vim-binding vim_binding ; \
+#    jupyter nbextension enable vim_binding/vim_binding 
+# node.js kernel
+RUN npm install -g ijavascript
+RUN ijsinstall
+# bash kernel
+RUN pip3 install bash_kernel
+RUN python3 -m bash_kernel.install
+# adding postgresql kernel
+RUN apt-get install -yq libpq-dev
+RUN pip3 install psycopg2
+RUN pip3 install postgres_kernel
+# R kernel
+RUN jupyter labextension install @techrah/text-shortcuts
+# adding dark theme
+RUN pip3 install jupyter-themer
+RUN jupyter-themer -c mdn-like
 
+############################################################ 
+#                   Installing R Libraries
+############################################################ 
+ADD ./scripts/r-libraries.r /root/r-libraries.r.json
+RUN Rscript "/root/r-libraries.r.json"
+RUN apt-get install -yq r-cran-xml
+
+
+############################################################ 
+#                   Configuring Apache
+############################################################ 
+#.RUN pwd
+#.ADD ./conf/apache2/main.conf /etc/apache2/sites-available
+#.RUN a2enmod rewrite
+#.RUN a2enmod proxy_http
+#.RUN a2enmod proxy_wstunnel
+#.RUN a2dissite 000-default.conf
+#.RUN a2ensite main.conf
+
+############################################################ 
+#                   Start command
+############################################################ 
+ADD ./pm2.json /root/pm2.json
+CMD npm install --prefix /data/node-red ; \
+    source /etc/apache2/envvars; \
+    service apache2 start ; \
+    pm2 start "/root/pm2.json" --no-daemon

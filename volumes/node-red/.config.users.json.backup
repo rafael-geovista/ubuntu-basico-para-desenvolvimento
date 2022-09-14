@@ -28,7 +28,7 @@
                 "view-show-welcome-tours": true
             },
             "tours": {
-                "welcome": "2.2.2"
+                "welcome": "3.0.1"
             }
         },
         "git": {
@@ -44,8 +44,8 @@
                 "mode": "manual"
             }
         },
-        "menu-deploymenu-item-node": true,
-        "menu-deploymenu-item-full": false,
+        "menu-deploymenu-item-node": false,
+        "menu-deploymenu-item-full": true,
         "menu-menu-item-sidebar": true
     }
 }
